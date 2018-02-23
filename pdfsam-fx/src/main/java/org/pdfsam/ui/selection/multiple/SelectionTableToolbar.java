@@ -56,158 +56,178 @@ import javafx.stage.FileChooser;
  */
 class SelectionTableToolbar extends ToolBar implements ModuleOwned {
 
-    private String ownerModule = StringUtils.EMPTY;
+	private String ownerModule = StringUtils.EMPTY;
 
-    public SelectionTableToolbar(String ownerModule, boolean canMove) {
-        this.ownerModule = defaultString(ownerModule);
-        getItems().addAll(new AddButton(ownerModule), new ClearButton(ownerModule), new RemoveButton(ownerModule));
-        if (canMove) {
-            getItems().addAll(new MoveUpButton(ownerModule), new MoveDownButton(ownerModule));
-        }
-        getStyleClass().add("selection-tool-bar");
-    }
+	public SelectionTableToolbar(String ownerModule, boolean canMove) {
+		this.ownerModule = defaultString(ownerModule);
+		getItems().addAll(new AddButton(ownerModule), new ClearButton(ownerModule), new RemoveButton(ownerModule));
+		if (canMove) {
+			getItems().addAll(new MoveUpButton(ownerModule), new MoveDownButton(ownerModule),
+					new MoveToTopButton(ownerModule), new MoveToBottomButton(ownerModule));
+		}
+		getStyleClass().add("selection-tool-bar");
+	}
 
-    @Override
-    public String getOwnerModule() {
-        return ownerModule;
-    }
+	@Override
+	public String getOwnerModule() {
+		return ownerModule;
+	}
 
-    /**
-     * Button to request the load of the pdf documents selected using a {@link FileChooser}
-     * 
-     * @author Andrea Vacondio
-     * 
-     */
-    static class AddButton extends ModuleOwnedButton {
+	/**
+	 * Button to request the load of the pdf documents selected using a
+	 * {@link FileChooser}
+	 * 
+	 * @author Andrea Vacondio
+	 * 
+	 */
+	static class AddButton extends ModuleOwnedButton {
 
-        public AddButton(String ownerModule) {
-            super(ownerModule);
-            setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Add documents to the table")));
-            setText(DefaultI18nContext.getInstance().i18n("_Add"));
-            setOnAction(this::loadDocuments);
-        }
+		public AddButton(String ownerModule) {
+			super(ownerModule);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Add documents to the table")));
+			setText(DefaultI18nContext.getInstance().i18n("_Add"));
+			setOnAction(this::loadDocuments);
+		}
 
-        public void loadDocuments(ActionEvent event) {
-            RememberingLatestFileChooserWrapper fileChooser = FileChoosers.getFileChooser(FileType.PDF,
-                    DefaultI18nContext.getInstance().i18n("Select pdf documents to load"));
-            List<File> chosenFiles = fileChooser.showOpenMultipleDialog(this.getScene().getWindow());
-            if (chosenFiles != null && !chosenFiles.isEmpty()) {
-                PdfLoadRequestEvent loadEvent = new PdfLoadRequestEvent(getOwnerModule());
-                chosenFiles.stream().map(PdfDocumentDescriptor::newDescriptorNoPassword).forEach(loadEvent::add);
-                eventStudio().broadcast(loadEvent, getOwnerModule());
-            }
-        }
-    }
+		public void loadDocuments(ActionEvent event) {
+			RememberingLatestFileChooserWrapper fileChooser = FileChoosers.getFileChooser(FileType.PDF,
+					DefaultI18nContext.getInstance().i18n("Select pdf documents to load"));
+			List<File> chosenFiles = fileChooser.showOpenMultipleDialog(this.getScene().getWindow());
+			if (chosenFiles != null && !chosenFiles.isEmpty()) {
+				PdfLoadRequestEvent loadEvent = new PdfLoadRequestEvent(getOwnerModule());
+				chosenFiles.stream().map(PdfDocumentDescriptor::newDescriptorNoPassword).forEach(loadEvent::add);
+				eventStudio().broadcast(loadEvent, getOwnerModule());
+			}
+		}
+	}
 
-    /**
-     * Button to request that the selected rows are removed
-     * 
-     * @author Andrea Vacondio
-     * 
-     */
-    static class RemoveButton extends ModuleOwnedButton {
+	/**
+	 * Button to request that the selected rows are removed
+	 * 
+	 * @author Andrea Vacondio
+	 * 
+	 */
+	static class RemoveButton extends ModuleOwnedButton {
 
-        public RemoveButton(String ownerModule) {
-            super(ownerModule);
-            setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Removes selected documents")));
-            setText(DefaultI18nContext.getInstance().i18n("_Remove"));
-            setOnAction(this::removeSelected);
-            setDisable(true);
-            eventStudio().addAnnotatedListeners(this);
-        }
+		public RemoveButton(String ownerModule) {
+			super(ownerModule);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Removes selected documents")));
+			setText(DefaultI18nContext.getInstance().i18n("_Remove"));
+			setOnAction(this::removeSelected);
+			setDisable(true);
+			eventStudio().addAnnotatedListeners(this);
+		}
 
-        public void removeSelected(ActionEvent event) {
-            eventStudio().broadcast(new RemoveSelectedEvent(), getOwnerModule());
-        }
+		public void removeSelected(ActionEvent event) {
+			eventStudio().broadcast(new RemoveSelectedEvent(), getOwnerModule());
+		}
 
-        @EventListener
-        public void disableIfNoSelection(final SelectionChangedEvent event) {
-            setDisable(event.isClearSelection());
-        }
-    }
+		@EventListener
+		public void disableIfNoSelection(final SelectionChangedEvent event) {
+			setDisable(event.isClearSelection());
+		}
+	}
 
-    /**
-     * Button to request the selection table to clear its data
-     * 
-     * @author Andrea Vacondio
-     * 
-     */
-    static class ClearButton extends SplitMenuButton implements ModuleOwned {
+	/**
+	 * Button to request the selection table to clear its data
+	 * 
+	 * @author Andrea Vacondio
+	 * 
+	 */
+	static class ClearButton extends SplitMenuButton implements ModuleOwned {
 
-        private String ownerModule = StringUtils.EMPTY;
+		private String ownerModule = StringUtils.EMPTY;
 
-        public ClearButton(String ownerModule) {
-            this.ownerModule = defaultString(ownerModule);
-            getStyleClass().addAll(Style.BUTTON.css());
-            getStyleClass().add("pdfsam-split-button");
-            setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Removes every document")));
-            setText(DefaultI18nContext.getInstance().i18n("_Clear"));
-            setOnAction(this::clear);
+		public ClearButton(String ownerModule) {
+			this.ownerModule = defaultString(ownerModule);
+			getStyleClass().addAll(Style.BUTTON.css());
+			getStyleClass().add("pdfsam-split-button");
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Removes every document")));
+			setText(DefaultI18nContext.getInstance().i18n("_Clear"));
+			setOnAction(this::clear);
 
-            MenuItem clearAllSettings = new MenuItem();
-            clearAllSettings.setText(DefaultI18nContext.getInstance().i18n("C_lear all settings"));
-            clearAllSettings.setOnAction(this::clearAll);
-            getItems().add(clearAllSettings);
-        }
+			MenuItem clearAllSettings = new MenuItem();
+			clearAllSettings.setText(DefaultI18nContext.getInstance().i18n("C_lear all settings"));
+			clearAllSettings.setOnAction(this::clearAll);
+			getItems().add(clearAllSettings);
+		}
 
-        public void clear(ActionEvent event) {
-            eventStudio().broadcast(new ClearModuleEvent(), getOwnerModule());
-        }
+		public void clear(ActionEvent event) {
+			eventStudio().broadcast(new ClearModuleEvent(), getOwnerModule());
+		}
 
-        public void clearAll(ActionEvent event) {
-            eventStudio().broadcast(new ClearModuleEvent(true), getOwnerModule());
-        }
+		public void clearAll(ActionEvent event) {
+			eventStudio().broadcast(new ClearModuleEvent(true), getOwnerModule());
+		}
 
-        @Override
-        @EventStation
-        public String getOwnerModule() {
-            return ownerModule;
-        }
-    }
+		@Override
+		@EventStation
+		public String getOwnerModule() {
+			return ownerModule;
+		}
+	}
 
-    /**
-     * Base button for move selected rows actions
-     * 
-     * @author Andrea Vacondio
-     * 
-     */
-    private static class BaseMoveSelectedButton extends ModuleOwnedButton {
+	/**
+	 * Base button for move selected rows actions
+	 * 
+	 * @author Andrea Vacondio
+	 * 
+	 */
+	private static class BaseMoveSelectedButton extends ModuleOwnedButton {
 
-        private MoveType type;
+		private MoveType type;
 
-        public BaseMoveSelectedButton(String ownerModule, MoveType type) {
-            super(ownerModule);
-            this.type = type;
-            setDisable(true);
-            setOnAction(this::moveOnClick);
-            eventStudio().addAnnotatedListeners(this);
-        }
+		public BaseMoveSelectedButton(String ownerModule, MoveType type) {
+			super(ownerModule);
+			this.type = type;
+			setDisable(true);
+			setOnAction(this::moveOnClick);
+			eventStudio().addAnnotatedListeners(this);
+		}
 
-        public void moveOnClick(ActionEvent event) {
-            eventStudio().broadcast(new MoveSelectedEvent(type), getOwnerModule());
-        }
+		public void moveOnClick(ActionEvent event) {
+			eventStudio().broadcast(new MoveSelectedEvent(type), getOwnerModule());
+		}
 
-        @EventListener
-        public void disableIfCannotMoveDown(final SelectionChangedEvent event) {
-            setDisable(!event.canMove(type));
-        }
-    }
+		@EventListener
+		public void disableIfCannotMoveDown(final SelectionChangedEvent event) {
+			setDisable(!event.canMove(type));
+		}
+	}
 
-    static class MoveUpButton extends BaseMoveSelectedButton {
+	static class MoveUpButton extends BaseMoveSelectedButton {
 
-        public MoveUpButton(String ownerModule) {
-            super(ownerModule, MoveType.UP);
-            setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves up selected documents")));
-            setText(DefaultI18nContext.getInstance().i18n("Move _Up"));
-        }
-    }
+		public MoveUpButton(String ownerModule) {
+			super(ownerModule, MoveType.UP);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves up selected documents")));
+			setText(DefaultI18nContext.getInstance().i18n("Move _Up"));
+		}
+	}
 
-    static class MoveDownButton extends BaseMoveSelectedButton {
+	static class MoveDownButton extends BaseMoveSelectedButton {
 
-        public MoveDownButton(String ownerModule) {
-            super(ownerModule, MoveType.DOWN);
-            setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves down selected documents")));
-            setText(DefaultI18nContext.getInstance().i18n("Move _Down"));
-        }
-    }
+		public MoveDownButton(String ownerModule) {
+			super(ownerModule, MoveType.DOWN);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves down selected documents")));
+			setText(DefaultI18nContext.getInstance().i18n("Move _Down"));
+		}
+	}
+
+	static class MoveToTopButton extends BaseMoveSelectedButton {
+
+		public MoveToTopButton(String ownerModule) {
+			super(ownerModule, MoveType.TOP);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves selected document to the top")));
+			setText(DefaultI18nContext.getInstance().i18n("Move to Top"));
+		}
+	}
+
+	static class MoveToBottomButton extends BaseMoveSelectedButton {
+
+		public MoveToBottomButton(String ownerModule) {
+			super(ownerModule, MoveType.BOTTOM);
+			setTooltip(new Tooltip(DefaultI18nContext.getInstance().i18n("Moves selected document to the bottom")));
+			setText(DefaultI18nContext.getInstance().i18n("Move to Bottom"));
+		}
+	}
 }
