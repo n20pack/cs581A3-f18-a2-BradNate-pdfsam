@@ -62,5 +62,27 @@
 			<artifactId>testFx</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.sejda</groupId>
+			<artifactId>sejda-sambox</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>org.bouncycastle</groupId>
+					<artifactId>bcprov-jdk15</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.bouncycastle</groupId>
+					<artifactId>bcmail-jdk15</artifactId>
+				</exclusion>
+				<exclusion>
+					<artifactId>poi-ooxml</artifactId>
+					<groupId>org.apache.poi</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>sejda-image-writers</artifactId>
+					<groupId>org.sejda</groupId>
+				</exclusion>
+			</exclusions>
+		</dependency>
 	</dependencies>
 </project>
