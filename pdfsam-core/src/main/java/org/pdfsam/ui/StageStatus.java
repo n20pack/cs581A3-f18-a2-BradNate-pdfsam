@@ -24,6 +24,8 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
+import javafx.stage.Screen;
+
 /**
  * Holds data regarding the status of the main stage
  * 
@@ -32,112 +34,116 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
  */
 public class StageStatus {
 
-    public static final StageStatus NULL = new StageStatus(0, 0, 0, 0) {
-        @Override
-        public void setX(double x) {
-            throw new UnsupportedOperationException();
-        }
+	public static final StageStatus NULL = new StageStatus(0, 0, 0, 0) {
+		@Override
+		public void setX(double x) {
+			throw new UnsupportedOperationException();
+		}
 
-        @Override
-        public void setY(double y) {
-            throw new UnsupportedOperationException();
-        }
+		@Override
+		public void setY(double y) {
+			throw new UnsupportedOperationException();
+		}
 
-        @Override
-        public void setWidth(double width) {
-            throw new UnsupportedOperationException();
-        }
+		@Override
+		public void setWidth(double width) {
+			throw new UnsupportedOperationException();
+		}
 
-        @Override
-        public void setHeight(double height) {
-            throw new UnsupportedOperationException();
-        }
+		@Override
+		public void setHeight(double height) {
+			throw new UnsupportedOperationException();
+		}
 
-        @Override
-        public void setMode(StageMode mode) {
-            throw new UnsupportedOperationException();
-        }
-    };
+		@Override
+		public void setMode(StageMode mode) {
+			throw new UnsupportedOperationException();
+		}
+	};
 
-    private double x;
-    private double y;
-    private double width;
-    private double height;
-    private StageMode mode;
+	private double x;
+	private double y;
+	private double width;
+	private double height;
+	private StageMode mode;
 
-    StageStatus() {
-        // jackson
-    }
+	StageStatus() {
+		// jackson
+	}
 
-    public StageStatus(double x, double y, double width, double height) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        this.mode = StageMode.DEFAULT;
-    }
+	public StageStatus(double x, double y, double width, double height) {
+		this.x = x;
+		this.y = y;
+		this.width = width;
+		this.height = height;
+		this.mode = StageMode.DEFAULT;
+	}
 
-    public double getX() {
-        return x;
-    }
+	public double getX() {
+		return x;
+	}
 
-    public void setX(double x) {
-        this.x = x;
-    }
+	public void setX(double x) {
+		this.x = x;
+	}
 
-    public double getY() {
-        return y;
-    }
+	public double getY() {
+		return y;
+	}
 
-    public void setY(double y) {
-        this.y = y;
-    }
+	public void setY(double y) {
+		this.y = y;
+	}
 
-    public double getWidth() {
-        return width;
-    }
+	public double getWidth() {
+		return width;
+	}
 
-    public void setWidth(double width) {
-        this.width = width;
-    }
+	public void setWidth(double width) {
+		this.width = width;
+	}
 
-    public double getHeight() {
-        return height;
-    }
+	public double getHeight() {
+		return height;
+	}
 
-    public void setHeight(double height) {
-        this.height = height;
-    }
+	public void setHeight(double height) {
+		this.height = height;
+	}
 
-    public void setMode(StageMode mode) {
-        requireNotNull(mode, "Stage mode cannot be null");
-        this.mode = mode;
-    }
+	public void setMode(StageMode mode) {
+		requireNotNull(mode, "Stage mode cannot be null");
+		this.mode = mode;
+	}
 
-    public StageMode getMode() {
-        return mode;
-    }
+	public StageMode getMode() {
+		return mode;
+	}
 
-    @Override
-    public String toString() {
-        return ReflectionToStringBuilder.toString(this);
-    }
+	@Override
+	public String toString() {
+		return ReflectionToStringBuilder.toString(this);
+	}
 
-    @Override
-    public int hashCode() {
-        return new HashCodeBuilder().append(x).append(y).append(width).append(height).append(mode).toHashCode();
-    }
+	@Override
+	public int hashCode() {
+		return new HashCodeBuilder().append(x).append(y).append(width).append(height).append(mode).toHashCode();
+	}
 
-    @Override
-    public boolean equals(Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof StageStatus)) {
-            return false;
-        }
-        StageStatus item = (StageStatus) other;
-        return new EqualsBuilder().append(x, item.getX()).append(y, item.getY()).append(width, item.getWidth())
-                .append(height, item.getHeight()).append(mode, item.getMode()).isEquals();
-    }
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) {
+			return true;
+		}
+		if (!(other instanceof StageStatus)) {
+			return false;
+		}
+		StageStatus item = (StageStatus) other;
+		return new EqualsBuilder().append(x, item.getX()).append(y, item.getY()).append(width, item.getWidth())
+				.append(height, item.getHeight()).append(mode, item.getMode()).isEquals();
+	}
+
+	public boolean hasAvailableScreen() {
+		return !Screen.getScreensForRectangle(getX(), getY(), getWidth(), getHeight()).isEmpty();
+	}
 }

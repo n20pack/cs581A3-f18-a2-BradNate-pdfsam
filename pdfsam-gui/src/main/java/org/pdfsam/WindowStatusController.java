@@ -59,7 +59,7 @@ class WindowStatusController {
     private void initUi() {
         StageStatus latestStatus = service.getLatestStatus();
         if (!Boolean.getBoolean(PDFSAM_DISABLE_UI_RESTORE) && !StageStatus.NULL.equals(latestStatus)
-                && hasAvailableScreen(latestStatus)) {
+                && latestStatus.hasAvailableScreen()) {
             restore(latestStatus);
             LOG.trace("Stage status restored to {}", latestStatus);
         } else {
@@ -89,10 +89,5 @@ class WindowStatusController {
 
     private boolean isNotMac() {
         return !Optional.of(System.getProperty("os.name")).orElse("").toLowerCase().contains("mac");
-    }
-
-    private boolean hasAvailableScreen(StageStatus status) {
-        return !Screen.getScreensForRectangle(status.getX(), status.getY(), status.getWidth(), status.getHeight())
-                .isEmpty();
     }
 }
