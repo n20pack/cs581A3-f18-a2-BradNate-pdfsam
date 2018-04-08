@@ -71,4 +71,8 @@ class DashboardTile extends VBox {
 	void addBottomPanel(Region pane) {
 		getChildren().add(pane);
 	}
+
+	public final boolean isArmed() {
+		return dashboardTileArmed.isArmed();
+	}
 }
