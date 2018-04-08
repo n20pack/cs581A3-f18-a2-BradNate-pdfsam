@@ -91,231 +91,238 @@ import javafx.stage.Window;
  */
 public class SingleSelectionPane extends VBox implements ModuleOwned, PdfDocumentDescriptorProvider, RestorableView {
 
-    private String ownerModule = StringUtils.EMPTY;
-    private BrowsableFileField field = new BrowsableFileField(FileType.PDF, OpenType.OPEN);
-    private Label details = new Label();
-    private PdfDocumentDescriptor descriptor;
-    private PasswordFieldPopup passwordPopup;
-    private Label encryptionIndicator = new Label();
-    private MenuItem removeSelected;
-
-    private Consumer<PdfDocumentDescriptor> onLoaded = d -> {
-        eventStudio().broadcast(requestFallbackDestination(d.getFile(), getOwnerModule()), getOwnerModule());
-        eventStudio().broadcast(new ChangedSelectedPdfVersionEvent(d.getVersion()), getOwnerModule());
-    };
-
-    private Consumer<PdfDocumentDescriptor> detailsUpdate = d -> {
-        PdfDescriptorLoadingStatus status = d.loadingStatus().getValue();
-        if (status == PdfDescriptorLoadingStatus.LOADED
-                || status == PdfDescriptorLoadingStatus.LOADED_WITH_USER_PWD_DECRYPTION) {
-            details.setText(DefaultI18nContext.getInstance().i18n("Pages: {0}, PDF Version: {1}",
-                    Integer.toString(d.pages().getValue()), d.getVersionString()));
-        } else if (status == PdfDescriptorLoadingStatus.LOADING) {
-            details.setText(DefaultI18nContext.getInstance().i18n("Loading..."));
-        } else {
-            details.setText("");
-        }
-    };
-
-    private Consumer<PdfDocumentDescriptor> encryptionIndicatorUpdate = new Consumer<PdfDocumentDescriptor>() {
-        private LoadingStatusIndicatorUpdater updater = new LoadingStatusIndicatorUpdater(encryptionIndicator);
-
-        @Override
-        public void accept(PdfDocumentDescriptor t) {
-            updater.accept(t.loadingStatus().getValue());
-        }
-    };
-
-    private ChangeListener<PdfDescriptorLoadingStatus> onLoadingStatusChange = (o, oldVal, newVal) -> {
-        if (descriptor != null & descriptor.hasReferences()) {
-            encryptionIndicatorUpdate.andThen(detailsUpdate).andThen(d -> {
-                PdfDescriptorLoadingStatus status = d.loadingStatus().getValue();
-                if (status == PdfDescriptorLoadingStatus.LOADED
-                        || status == PdfDescriptorLoadingStatus.LOADED_WITH_USER_PWD_DECRYPTION) {
-                    onLoaded.accept(d);
-                }
-            }).accept(descriptor);
-        }
-    };
-
-    private ToggleChangeListener<? super ValidationState> onValidState = new ToggleChangeListener<ValidationState>() {
-
-        @Override
-        public void onChanged(ObservableValue<? extends ValidationState> observable, ValidationState oldValue,
-                ValidationState newVal) {
-            if (newVal == ValidationState.VALID) {
-                initializeFor(newDescriptorNoPassword(new File(field.getTextField().getText())));
-            } else {
-                reset();
-            }
-        }
-    };
-
-    public SingleSelectionPane(String ownerModule) {
-        this.getStyleClass().add("single-selection-pane");
-        this.ownerModule = defaultString(ownerModule);
-        this.details.getStyleClass().add("-pdfsam-selection-details");
-        field.enforceValidation(true, false);
-        passwordPopup = new PasswordFieldPopup(this.ownerModule);
-        encryptionIndicator.getStyleClass().addAll("encryption-status");
-        encryptionIndicator.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-            if (descriptor.loadingStatus().getValue() == ENCRYPTED) {
-                showPasswordFieldPopup();
-            } else if (descriptor.loadingStatus().getValue() == WITH_ERRORS) {
-                eventStudio().broadcast(new ShowStageRequest(), "LogStage");
-            }
-        });
-        HBox.setMargin(encryptionIndicator, new Insets(0, 0, 0, 2));
-        field.setGraphic(encryptionIndicator);
-        field.getStyleClass().add("single-selection-top");
-        HBox.setHgrow(field, Priority.ALWAYS);
-        getChildren().addAll(field, details);
-        field.getTextField().validProperty().addListener(onValidState);
-        initContextMenu();
-        eventStudio().addAnnotatedListeners(this);
-    }
-
-    private void initializeFor(PdfDocumentDescriptor docDescriptor) {
-        invalidateDescriptor();
-        PdfLoadRequestEvent loadEvent = new PdfLoadRequestEvent(getOwnerModule());
-        descriptor = docDescriptor;
-        descriptor.loadingStatus().addListener(new WeakChangeListener<>(onLoadingStatusChange));
-        setContextMenuDisable(false);
-        loadEvent.add(descriptor);
-        eventStudio().broadcast(loadEvent);
-    }
-
-    private void reset() {
-        invalidateDescriptor();
-        setContextMenuDisable(true);
-        encryptionIndicator.setText("");
-        details.setText("");
-    }
-
-    private void disableRemoveMenuItemIfNeeded() {
-        removeSelected.setDisable(isEmpty(field.getTextField().getText()));
-    }
-
-    private void setContextMenuDisable(boolean value) {
-        field.getTextField().getContextMenu().getItems().forEach(i -> i.setDisable(value));
-        disableRemoveMenuItemIfNeeded();
-    }
-
-    private void invalidateDescriptor() {
-        if (nonNull(descriptor)) {
-            descriptor.releaseAll();
-        }
-    }
-
-    private void showPasswordFieldPopup() {
-        Scene scene = this.getScene();
-        if (scene != null) {
-            Window owner = scene.getWindow();
-            if (owner != null && owner.isShowing()) {
-                Point2D nodeCoord = encryptionIndicator.localToScene(encryptionIndicator.getWidth() / 2,
-                        encryptionIndicator.getHeight() / 1.5);
-                double anchorX = Math.round(owner.getX() + scene.getX() + nodeCoord.getX() + 2);
-                double anchorY = Math.round(owner.getY() + scene.getY() + nodeCoord.getY() + 2);
-                passwordPopup.showFor(this, descriptor, anchorX, anchorY);
-            }
-        }
-    }
-
-    @Override
-    public PdfDocumentDescriptor getPdfDocumentDescriptor() {
-        return descriptor;
-    }
-
-    protected BrowsableFileField getField() {
-        return field;
-    }
-
-    @Override
-    public void saveStateTo(Map<String, String> data) {
-        if (descriptor != null) {
-            data.put(defaultString(getId()) + "input", descriptor.getFile().getAbsolutePath());
-            if (new DefaultUserContext().isSavePwdInWorkspaceFile()) {
-                data.put(defaultString(getId()) + "input.password", descriptor.getPassword());
-            }
-        }
-    }
-
-    @Override
-    public void restoreStateFrom(Map<String, String> data) {
-        getField().getTextField().setText(EMPTY);
-        Optional.ofNullable(data.get(defaultString(getId()) + "input")).ifPresent(f -> {
-            onValidState.disabled(true);
-            getField().getTextField().setText(f);
-            onValidState.disabled(false);
-            initializeFor(newDescriptor(new File(f), data.get(defaultString(getId()) + "input.password")));
-        });
-    }
-
-    /**
-     * to perform when the document is loaded
-     * 
-     * @param onDescriptorLoaded
-     */
-    public void addOnLoaded(Consumer<PdfDocumentDescriptor> onDescriptorLoaded) {
-        this.onLoaded = onDescriptorLoaded.andThen(this.onLoaded);
-    }
-
-    private void initContextMenu() {
-        MenuItem infoItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Document properties"),
-                MaterialDesignIcon.INFORMATION_OUTLINE);
-        infoItem.setAccelerator(new KeyCodeCombination(KeyCode.P, KeyCombination.ALT_DOWN));
-        infoItem.setOnAction(
-                e -> Platform.runLater(() -> eventStudio().broadcast(new ShowPdfDescriptorRequest(descriptor))));
-
-        removeSelected = createMenuItem(DefaultI18nContext.getInstance().i18n("Remove"), MaterialDesignIcon.MINUS);
-        removeSelected.setOnAction(e -> eventStudio().broadcast(new ClearModuleEvent(), getOwnerModule()));
-
-        MenuItem setDestinationItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Set destination"),
-                MaterialIcon.FLIGHT_LAND);
-        setDestinationItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.ALT_DOWN));
-        setDestinationItem.setOnAction(e -> eventStudio()
-                .broadcast(requestDestination(descriptor.getFile(), getOwnerModule()), getOwnerModule()));
-
-        MenuItem openFileItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Open"),
-                MaterialDesignIcon.FILE_PDF_BOX);
-        openFileItem.setOnAction(e -> eventStudio().broadcast(new OpenFileRequest(descriptor.getFile())));
-
-        MenuItem openFolderItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Open Folder"),
-                MaterialDesignIcon.FOLDER_OUTLINE);
-        openFolderItem
-                .setOnAction(e -> eventStudio().broadcast(new OpenFileRequest(descriptor.getFile().getParentFile())));
-
-        field.getTextField().setContextMenu(new ContextMenu(setDestinationItem, new SeparatorMenuItem(), removeSelected,
-                new SeparatorMenuItem(), infoItem, openFileItem, openFolderItem));
-    }
-
-    @EventListener
-    public void onClearSelected(ClearModuleEvent event) {
-        field.getTextField().setText("");
-        disableRemoveMenuItemIfNeeded();
-    }
-
-    @EventListener
-    public void onLoadDocumentsRequest(PdfLoadRequestEvent loadEvent) {
-        loadEvent.getDocuments().stream().findFirst().map(PdfDocumentDescriptor::getFile)
-                .ifPresent(field::setTextFromFile);
-    }
-
-    private MenuItem createMenuItem(String text, GlyphIcons icon) {
-        MenuItem item = new MenuItem(text);
-        GlyphsDude.setIcon(item, icon, "1.1em");
-        item.setDisable(true);
-        return item;
-    }
-
-    @Override
-    @EventStation
-    public String getOwnerModule() {
-        return ownerModule;
-    }
-
-    public void setPromptText(String text) {
-        field.getTextField().setPromptText(text);
-    }
 	private String ownerModule = StringUtils.EMPTY;
+	private BrowsableFileField field = new BrowsableFileField(FileType.PDF, OpenType.OPEN);
+	private Label details = new Label();
+	private PdfDocumentDescriptor descriptor;
+	private PasswordFieldPopup passwordPopup;
+	private Label encryptionIndicator = new Label();
+	private MenuItem removeSelected;
+
+	private Consumer<PdfDocumentDescriptor> onLoaded = d -> {
+		eventStudio().broadcast(requestFallbackDestination(d.getFile(), getOwnerModule()), getOwnerModule());
+		eventStudio().broadcast(new ChangedSelectedPdfVersionEvent(d.getVersion()), getOwnerModule());
+	};
+
+	private Consumer<PdfDocumentDescriptor> detailsUpdate = d -> {
+		PdfDescriptorLoadingStatus status = d.loadingStatus().getValue();
+		if (status == PdfDescriptorLoadingStatus.LOADED
+				|| status == PdfDescriptorLoadingStatus.LOADED_WITH_USER_PWD_DECRYPTION) {
+			details.setText(DefaultI18nContext.getInstance().i18n("Pages: {0}, PDF Version: {1}",
+					Integer.toString(d.pages().getValue()), d.getVersionString()));
+		} else if (status == PdfDescriptorLoadingStatus.LOADING) {
+			details.setText(DefaultI18nContext.getInstance().i18n("Loading..."));
+		} else {
+			details.setText("");
+		}
+	};
+
+	private Consumer<PdfDocumentDescriptor> encryptionIndicatorUpdate = new Consumer<PdfDocumentDescriptor>() {
+		private LoadingStatusIndicatorUpdater updater = new LoadingStatusIndicatorUpdater(encryptionIndicator);
+
+		@Override
+		public void accept(PdfDocumentDescriptor t) {
+			updater.accept(t.loadingStatus().getValue());
+		}
+	};
+
+	private ChangeListener<PdfDescriptorLoadingStatus> onLoadingStatusChange = (o, oldVal, newVal) -> {
+		if (descriptor != null & descriptor.hasReferences()) {
+			encryptionIndicatorUpdate.andThen(detailsUpdate).andThen(d -> {
+				PdfDescriptorLoadingStatus status = d.loadingStatus().getValue();
+				if (status == PdfDescriptorLoadingStatus.LOADED
+						|| status == PdfDescriptorLoadingStatus.LOADED_WITH_USER_PWD_DECRYPTION) {
+					onLoaded.accept(d);
+				}
+			}).accept(descriptor);
+		}
+	};
+
+	private ToggleChangeListener<? super ValidationState> onValidState = new ToggleChangeListener<ValidationState>() {
+
+		@Override
+		public void onChanged(ObservableValue<? extends ValidationState> observable, ValidationState oldValue,
+				ValidationState newVal) {
+			if (newVal == ValidationState.VALID) {
+				initializeFor(newDescriptorNoPassword(new File(field.getTextField().getText())));
+			} else {
+				reset();
+			}
+		}
+	};
+
+	public SingleSelectionPane(String ownerModule) {
+		this.getStyleClass().add("single-selection-pane");
+		this.ownerModule = defaultString(ownerModule);
+		this.details.getStyleClass().add("-pdfsam-selection-details");
+		field.enforceValidation(true, false);
+		passwordPopup = new PasswordFieldPopup(this.ownerModule);
+		encryptionIndicator.getStyleClass().addAll("encryption-status");
+		encryptionIndicator.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
+			if (descriptor.loadingStatus().getValue() == ENCRYPTED) {
+				showPasswordFieldPopup();
+			} else if (descriptor.loadingStatus().getValue() == WITH_ERRORS) {
+				eventStudio().broadcast(new ShowStageRequest(), "LogStage");
+			}
+		});
+		HBox.setMargin(encryptionIndicator, new Insets(0, 0, 0, 2));
+		field.setGraphic(encryptionIndicator);
+		field.getStyleClass().add("single-selection-top");
+		HBox.setHgrow(field, Priority.ALWAYS);
+		getChildren().addAll(field, details);
+		field.getTextField().validProperty().addListener(onValidState);
+		initContextMenu();
+		eventStudio().addAnnotatedListeners(this);
+	}
+
+	private void initializeFor(PdfDocumentDescriptor docDescriptor) {
+		invalidateDescriptor();
+		PdfLoadRequestEvent loadEvent = new PdfLoadRequestEvent(getOwnerModule());
+		descriptor = docDescriptor;
+		descriptor.loadingStatus().addListener(new WeakChangeListener<>(onLoadingStatusChange));
+		setContextMenuDisable(false);
+		loadEvent.add(descriptor);
+		eventStudio().broadcast(loadEvent);
+	}
+
+	private void reset() {
+		invalidateDescriptor();
+		setContextMenuDisable(true);
+		encryptionIndicator.setText("");
+		details.setText("");
+	}
+
+	private void disableRemoveMenuItemIfNeeded() {
+		removeSelected.setDisable(isEmpty(field.getTextField().getText()));
+	}
+
+	private void setContextMenuDisable(boolean value) {
+		field.getTextField().getContextMenu().getItems().forEach(i -> i.setDisable(value));
+		disableRemoveMenuItemIfNeeded();
+	}
+
+	private void invalidateDescriptor() {
+		if (nonNull(descriptor)) {
+			descriptor.releaseAll();
+		}
+	}
+
+	private void showPasswordFieldPopup() {
+		Scene scene = this.getScene();
+		if (scene != null) {
+			showPasswordPopupWindow(scene);
+		}
+	}
+
+	private void showPasswordPopupWindow(Scene scene) {
+		Window owner = scene.getWindow();
+		if (owner != null && owner.isShowing()) {
+			showPasswordPopupWindowAtCoordinates(scene, owner);
+		}
+	}
+
+	private void showPasswordPopupWindowAtCoordinates(Scene scene, Window owner) {
+		Point2D nodeCoord = encryptionIndicator.localToScene(encryptionIndicator.getWidth() / 2,
+				encryptionIndicator.getHeight() / 1.5);
+		double anchorX = Math.round(owner.getX() + scene.getX() + nodeCoord.getX() + 2);
+		double anchorY = Math.round(owner.getY() + scene.getY() + nodeCoord.getY() + 2);
+		passwordPopup.showFor(this, descriptor, anchorX, anchorY);
+	}
+
+	@Override
+	public PdfDocumentDescriptor getPdfDocumentDescriptor() {
+		return descriptor;
+	}
+
+	protected BrowsableFileField getField() {
+		return field;
+	}
+
+	@Override
+	public void saveStateTo(Map<String, String> data) {
+		if (descriptor != null) {
+			data.put(defaultString(getId()) + "input", descriptor.getFile().getAbsolutePath());
+			if (new DefaultUserContext().isSavePwdInWorkspaceFile()) {
+				data.put(defaultString(getId()) + "input.password", descriptor.getPassword());
+			}
+		}
+	}
+
+	@Override
+	public void restoreStateFrom(Map<String, String> data) {
+		getField().getTextField().setText(EMPTY);
+		Optional.ofNullable(data.get(defaultString(getId()) + "input")).ifPresent(f -> {
+			onValidState.disabled(true);
+			getField().getTextField().setText(f);
+			onValidState.disabled(false);
+			initializeFor(newDescriptor(new File(f), data.get(defaultString(getId()) + "input.password")));
+		});
+	}
+
+	/**
+	 * to perform when the document is loaded
+	 * 
+	 * @param onDescriptorLoaded
+	 */
+	public void addOnLoaded(Consumer<PdfDocumentDescriptor> onDescriptorLoaded) {
+		this.onLoaded = onDescriptorLoaded.andThen(this.onLoaded);
+	}
+
+	private void initContextMenu() {
+		MenuItem infoItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Document properties"),
+				MaterialDesignIcon.INFORMATION_OUTLINE);
+		infoItem.setAccelerator(new KeyCodeCombination(KeyCode.P, KeyCombination.ALT_DOWN));
+		infoItem.setOnAction(
+				e -> Platform.runLater(() -> eventStudio().broadcast(new ShowPdfDescriptorRequest(descriptor))));
+
+		removeSelected = createMenuItem(DefaultI18nContext.getInstance().i18n("Remove"), MaterialDesignIcon.MINUS);
+		removeSelected.setOnAction(e -> eventStudio().broadcast(new ClearModuleEvent(), getOwnerModule()));
+
+		MenuItem setDestinationItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Set destination"),
+				MaterialIcon.FLIGHT_LAND);
+		setDestinationItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.ALT_DOWN));
+		setDestinationItem.setOnAction(e -> eventStudio()
+				.broadcast(requestDestination(descriptor.getFile(), getOwnerModule()), getOwnerModule()));
+
+		MenuItem openFileItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Open"),
+				MaterialDesignIcon.FILE_PDF_BOX);
+		openFileItem.setOnAction(e -> eventStudio().broadcast(new OpenFileRequest(descriptor.getFile())));
+
+		MenuItem openFolderItem = createMenuItem(DefaultI18nContext.getInstance().i18n("Open Folder"),
+				MaterialDesignIcon.FOLDER_OUTLINE);
+		openFolderItem
+				.setOnAction(e -> eventStudio().broadcast(new OpenFileRequest(descriptor.getFile().getParentFile())));
+
+		field.getTextField().setContextMenu(new ContextMenu(setDestinationItem, new SeparatorMenuItem(), removeSelected,
+				new SeparatorMenuItem(), infoItem, openFileItem, openFolderItem));
+	}
+
+	@EventListener
+	public void onClearSelected(ClearModuleEvent event) {
+		field.getTextField().setText("");
+		disableRemoveMenuItemIfNeeded();
+	}
+
+	@EventListener
+	public void onLoadDocumentsRequest(PdfLoadRequestEvent loadEvent) {
+		loadEvent.getDocuments().stream().findFirst().map(PdfDocumentDescriptor::getFile)
+				.ifPresent(field::setTextFromFile);
+	}
+
+	private MenuItem createMenuItem(String text, GlyphIcons icon) {
+		MenuItem item = new MenuItem(text);
+		GlyphsDude.setIcon(item, icon, "1.1em");
+		item.setDisable(true);
+		return item;
+	}
+
+	@Override
+	@EventStation
+	public String getOwnerModule() {
+		return ownerModule;
+	}
+
+	public void setPromptText(String text) {
+		field.getTextField().setPromptText(text);
+	}
 }
