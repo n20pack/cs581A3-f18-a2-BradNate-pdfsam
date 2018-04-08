@@ -20,9 +20,6 @@ package org.pdfsam.ui.dashboard.modules;
 
 import static java.util.Objects.nonNull;
 
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
@@ -39,55 +36,39 @@ import javafx.scene.layout.VBox;
  *
  */
 class DashboardTile extends VBox {
-    private static final PseudoClass ARMED_PSEUDOCLASS_STATE = PseudoClass.getPseudoClass("armed");
 
-    private Button button = new Button();
+	private Button button = new Button();
 
-    public DashboardTile(String title, String description, Node graphic) {
-        getStyleClass().addAll("dashboard-modules-tile");
-        Label titleLabel = new Label(title);
-        titleLabel.getStyleClass().add("dashboard-modules-tile-title");
-        if (nonNull(graphic)) {
-            titleLabel.setGraphic(graphic);
-        }
-        Label textLabel = new Label(description);
-        textLabel.getStyleClass().add("dashboard-modules-tile-text");
-        textLabel.setMinHeight(USE_PREF_SIZE);
-        VBox topTile = new VBox(5);
-        topTile.getChildren().addAll(titleLabel, textLabel);
+	private DashboardTileArmed dashboardTileArmed;
 
-        button.getStyleClass().add("dashboard-modules-invisible-button");
-        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+	public DashboardTile(String title, String description, Node graphic) {
+		getStyleClass().addAll("dashboard-modules-tile");
+		Label titleLabel = new Label(title);
+		titleLabel.getStyleClass().add("dashboard-modules-tile-title");
+		if (nonNull(graphic)) {
+			titleLabel.setGraphic(graphic);
+		}
+		Label textLabel = new Label(description);
+		textLabel.getStyleClass().add("dashboard-modules-tile-text");
+		textLabel.setMinHeight(USE_PREF_SIZE);
+		VBox topTile = new VBox(5);
+		topTile.getChildren().addAll(titleLabel, textLabel);
 
-        armed.bind(button.armedProperty());
-        getChildren().addAll(new StackPane(topTile, button));
-        setMaxHeight(USE_PREF_SIZE);
-        setMinHeight(USE_PREF_SIZE);
-    }
+		button.getStyleClass().add("dashboard-modules-invisible-button");
+		button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-    /**
-     * Property telling if the region (acting as a button) is armed
-     */
-    ReadOnlyBooleanWrapper armed = new ReadOnlyBooleanWrapper(false) {
-        @Override
-        protected void invalidated() {
-            pseudoClassStateChanged(ARMED_PSEUDOCLASS_STATE, get());
-        }
-    };
+		dashboardTileArmed = new DashboardTileArmed(this);
+		dashboardTileArmed.bind(button.armedProperty());
+		getChildren().addAll(new StackPane(topTile, button));
+		setMaxHeight(USE_PREF_SIZE);
+		setMinHeight(USE_PREF_SIZE);
+	}
 
-    public final ReadOnlyBooleanProperty armedProperty() {
-        return armed.getReadOnlyProperty();
-    }
+	public final void setOnAction(EventHandler<ActionEvent> eventHandler) {
+		button.setOnAction(eventHandler);
+	}
 
-    public final boolean isArmed() {
-        return armed.get();
-    }
-
-    public final void setOnAction(EventHandler<ActionEvent> eventHandler) {
-        button.setOnAction(eventHandler);
-    }
-
-    void addBottomPanel(Region pane) {
-        getChildren().add(pane);
-    }
+	void addBottomPanel(Region pane) {
+		getChildren().add(pane);
+	}
 }

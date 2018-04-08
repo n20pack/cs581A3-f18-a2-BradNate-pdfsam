@@ -317,4 +317,5 @@ public class SingleSelectionPane extends VBox implements ModuleOwned, PdfDocumen
     public void setPromptText(String text) {
         field.getTextField().setPromptText(text);
     }
+	private String ownerModule = StringUtils.EMPTY;
 }
